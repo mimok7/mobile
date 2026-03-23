@@ -1,6 +1,5 @@
 import React from 'react';
-import React from 'react';
-import { X, Ship, Plane, Building, MapPin, Car, FileText, User, Calendar } from 'lucide-react';
+import { X, Ship, Plane, Building, MapPin, Car, FileText, User } from 'lucide-react';
 
 /* ── 유틸 ── */
 const fmt = (dateStr: string | null | undefined): string => {
