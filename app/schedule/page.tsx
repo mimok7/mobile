@@ -8,6 +8,7 @@ import {
   Calendar, Clock, Ship, Plane, Building, MapPin, Car,
   ChevronLeft, ChevronRight, Search, ArrowLeft, RefreshCw
 } from 'lucide-react';
+import ReservationDetailModal from './ReservationDetailModal';
 
 /* ── 타입 정의 ──────────────────────────────── */
 type ViewMode = 'day' | 'week' | 'month';
@@ -133,6 +134,8 @@ export default function SchedulePage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   /* ── 데이터 로드 (sh_* 테이블) ─── */
   const loadData = async () => {
@@ -275,7 +278,8 @@ export default function SchedulePage() {
         }),
       ];
 
-      setAllData(mapped);
+      // mark source for each row (sh_* origin)
+      setAllData(mapped.map(m => ({ ...m, source: 'sh' })));
     } catch (err) {
       console.error('데이터 로드 실패:', err);
     } finally {
@@ -353,7 +357,8 @@ export default function SchedulePage() {
     return (
       <div
         key={`${item.orderId}-${idx}`}
-        className={`bg-white border rounded-xl shadow-sm p-3 space-y-2 ${past ? 'opacity-50' : ''}`}
+        onClick={() => { setSelectedItem(item); setModalOpen(true); }}
+        className={`bg-white border rounded-xl shadow-sm p-3 space-y-2 ${past ? 'opacity-50' : ''} cursor-pointer`}
       >
         {/* 헤더 */}
         <div className="flex items-center gap-2 pb-2 border-b">
@@ -361,6 +366,9 @@ export default function SchedulePage() {
             <Icon className={`w-4 h-4 text-${conf.color}-600`} />
           </div>
           <span className="font-bold text-sm flex-1">{conf.name}</span>
+          {item.source === 'sh' && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 ml-2">Old</span>
+          )}
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${past ? 'bg-gray-200 text-gray-600' : `bg-${conf.color}-100 text-${conf.color}-700`}`}>
             {past ? '완료' : '예정'}
           </span>
@@ -594,6 +602,7 @@ export default function SchedulePage() {
           </div>
         )}
       </div>
+      <ReservationDetailModal isOpen={modalOpen} onClose={() => setModalOpen(false)} item={selectedItem} />
     </div>
   );
 }
