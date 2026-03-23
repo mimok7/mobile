@@ -367,8 +367,15 @@ export default function SchedulePage() {
           </div>
           <span className="font-bold text-sm flex-1">{conf.name}</span>
           {item.source === 'sh' && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 ml-2">Old</span>
+            <button
+              onClick={e => { e.stopPropagation(); setSelectedItem(item); setModalOpen(true); }}
+              className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >Old</button>
           )}
+          <button
+            onClick={e => { e.stopPropagation(); setSelectedItem(item); setModalOpen(true); }}
+            className={`text-xs px-2 py-0.5 rounded-full font-medium bg-${conf.color}-500 text-white hover:bg-${conf.color}-600`}
+          >상세</button>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${past ? 'bg-gray-200 text-gray-600' : `bg-${conf.color}-100 text-${conf.color}-700`}`}>
             {past ? '완료' : '예정'}
           </span>
