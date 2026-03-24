@@ -47,7 +47,7 @@ interface DetailServiceItem {
   fields: DetailField[];
 }
 
-type BulkAction = 'confirm' | 'cancel' | 'delete' | 'status_update';
+type BulkAction = 'approve' | 'confirm' | 'cancel' | 'delete' | 'status_update';
 type SortType = 'date' | 'name';
 
 /* ── 메인 컴포넌트 ──────────────────────────── */
@@ -57,10 +57,10 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('pending');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'confirmed' | 'cancelled'>('pending');
   const [serviceFilter, setServiceFilter] = useState('all');
-  const [bulkAction, setBulkAction] = useState<BulkAction>('confirm');
-  const [newStatus, setNewStatus] = useState('confirmed');
+  const [bulkAction, setBulkAction] = useState<BulkAction>('approve');
+  const [newStatus, setNewStatus] = useState('approved');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTrigger, setSearchTrigger] = useState(0);
   const [sortType, setSortType] = useState<SortType>('date');
@@ -209,7 +209,13 @@ export default function ReservationsPage() {
   /* ── 일괄 처리 ──────────────────────────── */
   const handleBulkAction = async () => {
     if (selectedItems.size === 0) return alert('처리할 항목을 선택해주세요.');
-    const actionText = { confirm: '확정', cancel: '취소', delete: '삭제', status_update: '상태 변경' }[bulkAction];
+    const actionText = {
+      approve: '승인',
+      confirm: '확정',
+      cancel: '취소',
+      delete: '삭제',
+      status_update: '상태 변경',
+    }[bulkAction];
     if (!confirm(`선택한 ${selectedItems.size}건을 ${actionText} 처리하시겠습니까?`)) return;
 
     setProcessing(true);
@@ -221,6 +227,9 @@ export default function ReservationsPage() {
         const batch = ids.slice(i, i + BATCH);
         let result;
         switch (bulkAction) {
+          case 'approve':
+            result = await supabase.from('reservation').update({ re_status: 'approved' }).in('re_id', batch);
+            break;
           case 'confirm':
             result = await supabase.from('reservation').update({ re_status: 'confirmed' }).in('re_id', batch);
             break;
@@ -542,11 +551,19 @@ export default function ReservationsPage() {
   };
 
   /* ── 유틸 함수 ──────────────────────────── */
-  const getStatusText = (s: string) => ({ pending: '대기중', confirmed: '확정', cancelled: '취소됨' }[s] || s);
+  const getStatusText = (s: string) => ({
+    pending: '대기중',
+    approved: '승인',
+    confirmed: '확정',
+    cancelled: '취소됨',
+  }[s] || s);
   const getStatusColor = (s: string) => ({
-    confirmed: 'bg-green-100 text-green-700', cancelled: 'bg-red-100 text-red-700',
+    approved: 'bg-blue-100 text-blue-700',
+    confirmed: 'bg-green-100 text-green-700',
+    cancelled: 'bg-red-100 text-red-700',
   }[s] || 'bg-yellow-100 text-yellow-700');
   const getStatusIcon = (s: string) => ({
+    approved: <CheckCircle className="w-3.5 h-3.5 text-blue-600" />,
     confirmed: <CheckCircle className="w-3.5 h-3.5 text-green-600" />,
     cancelled: <XCircle className="w-3.5 h-3.5 text-red-600" />,
   }[s] || <Clock className="w-3.5 h-3.5 text-yellow-600" />);
@@ -610,7 +627,7 @@ export default function ReservationsPage() {
             <Select value={sortType} onChange={e => setSortType(e.target.value as SortType)} label="정렬"
               options={[['date', '예약일순'], ['name', '고객명순']]} />
             <Select value={filter} onChange={e => setFilter(e.target.value as any)} label="상태"
-              options={[['all', '전체'], ['pending', '대기중'], ['confirmed', '확정'], ['cancelled', '취소']]} />
+              options={[[ 'all', '전체'], ['pending', '대기중'], ['approved', '승인'], ['confirmed', '확정'], ['cancelled', '취소']]} />
             <Select value={serviceFilter} onChange={e => setServiceFilter(e.target.value)} label="서비스"
               options={[['all', '전체'], ['cruise', '크루즈'], ['airport', '공항'], ['hotel', '호텔'],
                 ['tour', '투어'], ['rentcar', '렌터카'], ['vehicle', '차량'], ['sht', '스하차량'], ['package', '패키지']]} />
@@ -631,10 +648,10 @@ export default function ReservationsPage() {
           {/* 일괄 처리 */}
           <div className="flex gap-2 items-center">
             <Select value={bulkAction} onChange={e => setBulkAction(e.target.value as BulkAction)} label=""
-              options={[['confirm', '확정'], ['cancel', '취소'], ['status_update', '상태변경'], ['delete', '삭제']]} />
+              options={[[ 'approve', '승인'], ['confirm', '확정'], ['cancel', '취소'], ['status_update', '상태변경'], ['delete', '삭제']]} />
             {bulkAction === 'status_update' && (
               <Select value={newStatus} onChange={e => setNewStatus(e.target.value)} label=""
-                options={[['pending', '대기중'], ['confirmed', '확정'], ['cancelled', '취소']]} />
+                options={[[ 'pending', '대기중'], ['approved', '승인'], ['confirmed', '확정'], ['cancelled', '취소']]} />
             )}
             <button
               onClick={handleBulkAction}

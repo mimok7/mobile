@@ -42,7 +42,14 @@ interface ReservationItem {
   services: ServiceReservation[];
 }
 
-type StatusType = 'all' | 'pending' | 'confirmed' | 'processing' | 'cancelled' | 'completed';
+type StatusType =
+  | 'all'
+  | 'pending'
+  | 'approved'
+  | 'confirmed'
+  | 'processing'
+  | 'cancelled'
+  | 'completed';
 
 type ServiceTypeFilter =
   | 'all'
@@ -278,6 +285,7 @@ export default function ReservationEditPage() {
     return (
       {
         pending: '대기중',
+        approved: '승인',
         confirmed: '확정',
         processing: '처리중',
         cancelled: '취소',
@@ -319,6 +327,7 @@ export default function ReservationEditPage() {
               options={[
                 ['all', '전체 상태'],
                 ['pending', '대기중'],
+                ['approved', '승인'],
                 ['processing', '처리중'],
                 ['confirmed', '확정'],
                 ['cancelled', '취소'],
@@ -413,6 +422,7 @@ export default function ReservationEditPage() {
                             className="w-full px-2 py-2 text-sm border rounded-lg bg-white"
                           >
                             <option value="pending">대기중</option>
+                            <option value="approved">승인</option>
                             <option value="processing">처리중</option>
                             <option value="confirmed">확정</option>
                             <option value="cancelled">취소</option>
