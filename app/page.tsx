@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Calendar, ClipboardList } from 'lucide-react';
 
@@ -7,8 +8,14 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-6">
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">🏖️ 스테이하롱</h1>
-        <p className="text-gray-500 text-sm">예약 관리 모바일</p>
+        <Image
+          src="/logo.png"
+          alt="스테이하롱 로고"
+          width={220}
+          height={72}
+          className="mx-auto h-auto w-auto max-w-[220px]"
+          priority
+        />
       </div>
 
       <div className="w-full max-w-sm space-y-4">
