@@ -31,6 +31,21 @@ interface ReservationItem {
   services: ServiceReservation[];
 }
 
+interface DetailField {
+  label: string;
+  value: any;
+}
+
+interface DetailServiceItem {
+  type: string;
+  label: string;
+  sublabel?: string;
+  date?: string;
+  guest?: number;
+  price?: number;
+  fields: DetailField[];
+}
+
 type BulkAction = 'confirm' | 'cancel' | 'delete' | 'status_update';
 type SortType = 'date' | 'name';
 
@@ -52,7 +67,7 @@ export default function ReservationsPage() {
   // 상세보기 모달
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ReservationItem | null>(null);
-  const [detailServices, setDetailServices] = useState<any[]>([]);
+  const [detailServices, setDetailServices] = useState<DetailServiceItem[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => { loadReservations(); }, [filter, serviceFilter, searchTrigger, sortType]);
@@ -304,7 +319,7 @@ export default function ReservationsPage() {
       ]);
       const roomPriceMap = new Map((roomPrices.data || []).map(r => [r.id, r]));
 
-      const details: any[] = [];
+      const details: DetailServiceItem[] = [];
 
       (cruiseRes.data || []).forEach(r => {
         const info = roomPriceMap.get(r.room_price_code);
@@ -315,6 +330,20 @@ export default function ReservationsPage() {
           date: r.checkin,
           guest: r.guest_count,
           price: r.room_total_price,
+          fields: [
+            { label: '객실코드', value: r.room_price_code },
+            { label: '체크인', value: r.checkin },
+            { label: '객실수', value: r.room_count },
+            { label: '총 인원수', value: r.guest_count },
+            { label: '성인', value: r.adult_count },
+            { label: '아동', value: r.child_count },
+            { label: '유아', value: r.infant_count },
+            { label: '아동 엑스트라', value: r.child_extra_bed_count },
+            { label: '엑스트라', value: r.extra_bed_count },
+            { label: '싱글', value: r.single_count },
+            { label: '객실 총 금액', value: r.room_total_price },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
       (cruiseCarRes.data || []).forEach(r => {
@@ -324,6 +353,16 @@ export default function ReservationsPage() {
           sublabel: `${r.pickup_location || ''} → ${r.dropoff_location || ''}`,
           date: r.pickup_datetime,
           price: r.car_total_price,
+          fields: [
+            { label: '차량 코드', value: r.car_price_code },
+            { label: '차량 수', value: r.car_count },
+            { label: '승객 수', value: r.passenger_count },
+            { label: '픽업 장소', value: r.pickup_location },
+            { label: '하차 장소', value: r.dropoff_location },
+            { label: '픽업 일시', value: r.pickup_datetime },
+            { label: '차량 총 금액', value: r.car_total_price },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
       (airportRes.data || []).forEach(r => {
@@ -334,6 +373,18 @@ export default function ReservationsPage() {
           date: r.ra_datetime ? new Date(r.ra_datetime).toLocaleDateString('ko-KR') : '',
           guest: r.ra_passenger_count,
           price: r.total_price,
+          fields: [
+            { label: '가격 코드', value: r.airport_price_code },
+            { label: '구분', value: r.way_type || r.ra_way_type },
+            { label: '일시', value: r.ra_datetime },
+            { label: '인원', value: r.ra_passenger_count },
+            { label: '차량수', value: r.ra_car_count },
+            { label: '수하물', value: r.ra_luggage_count },
+            { label: '항공편', value: r.ra_flight_number },
+            { label: '공항 위치', value: r.ra_airport_location },
+            { label: '숙소 정보', value: r.accommodation_info },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
       (hotelRes.data || []).forEach(r => {
@@ -344,6 +395,16 @@ export default function ReservationsPage() {
           date: r.checkin_date,
           guest: r.guest_count,
           price: r.total_price,
+          fields: [
+            { label: '가격 코드', value: r.hotel_price_code },
+            { label: '호텔 카테고리', value: r.hotel_category },
+            { label: '체크인', value: r.checkin_date },
+            { label: '숙박일수', value: r.nights },
+            { label: '객실수', value: r.room_count },
+            { label: '투숙객', value: r.guest_count },
+            { label: '총 금액', value: r.total_price },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
       (tourRes.data || []).forEach(r => {
@@ -354,6 +415,15 @@ export default function ReservationsPage() {
           date: r.usage_date,
           guest: r.tour_capacity,
           price: r.total_price,
+          fields: [
+            { label: '가격 코드', value: r.tour_price_code },
+            { label: '사용일', value: r.usage_date },
+            { label: '인원', value: r.tour_capacity },
+            { label: '픽업 위치', value: r.pickup_location },
+            { label: '하차 위치', value: r.dropoff_location },
+            { label: '총 금액', value: r.total_price },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
       (shtRes.data || []).forEach(r => {
@@ -363,6 +433,17 @@ export default function ReservationsPage() {
           sublabel: `${r.vehicle_number || ''} / ${r.seat_number || ''}`,
           date: r.usage_date,
           price: r.car_total_price,
+          fields: [
+            { label: '탑승일', value: r.usage_date },
+            { label: '차량번호', value: r.vehicle_number },
+            { label: '좌석번호', value: r.seat_number },
+            { label: '구분', value: r.service_type },
+            { label: '카테고리', value: r.category },
+            { label: '색상', value: r.color_label },
+            { label: '탑승자명', value: r.name },
+            { label: '총 금액', value: r.car_total_price },
+            { label: '요청사항', value: r.request_note },
+          ],
         });
       });
 
@@ -651,6 +732,23 @@ export default function ReservationsPage() {
                           </span>
                         )}
                       </div>
+
+                      {svc.fields && svc.fields.length > 0 && (
+                        <div className="mt-2 ml-6 border-t pt-2 grid grid-cols-1 gap-1">
+                          {svc.fields
+                            .filter((f) => f.value !== undefined && f.value !== null && String(f.value) !== '')
+                            .map((f, idx) => (
+                              <div key={`${f.label}-${idx}`} className="flex items-start justify-between gap-2">
+                                <span className="text-xs text-gray-500">{f.label}</span>
+                                <span className="text-xs text-gray-700 text-right break-all">
+                                  {typeof f.value === 'number' && /금액/.test(f.label)
+                                    ? `${Number(f.value).toLocaleString()}원`
+                                    : String(f.value)}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
