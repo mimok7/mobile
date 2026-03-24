@@ -324,7 +324,7 @@ export default function ReservationsPage() {
               .in('id', cruiseCodes)
           : { data: [] },
         cruiseCarPriceCodes.length > 0
-          ? supabase.from('car_price').select('car_code, price').in('car_code', cruiseCarPriceCodes)
+          ? supabase.from('car_price').select('car_code, price, car_type, cruise, car_category').in('car_code', cruiseCarPriceCodes)
           : { data: [] },
       ]);
       const roomPriceMap = new Map((roomPrices.data || []).map(r => [r.id, r]));
@@ -334,7 +334,7 @@ export default function ReservationsPage() {
 
       (cruiseRes.data || []).forEach(r => {
         const info = roomPriceMap.get(r.room_price_code);
-        const feeSummary = [
+        let feeSummary = [
           formatLinePrice('성인', info?.price_adult, r.adult_count),
           formatLinePrice('아동', info?.price_child, r.child_count),
           formatLinePrice('유아', info?.price_infant, r.infant_count),
@@ -342,6 +342,10 @@ export default function ReservationsPage() {
           formatLinePrice('엑스트라', info?.price_extra_bed, r.extra_bed_count),
           formatLinePrice('싱글', info?.price_single, r.single_count),
         ].filter(Boolean) as string[];
+
+        if (feeSummary.length === 0 && Number(r.room_total_price || 0) > 0) {
+          feeSummary = [`총액 ${formatDong(Number(r.room_total_price))}`];
+        }
 
         details.push({
           type: 'cruise',
@@ -368,17 +372,29 @@ export default function ReservationsPage() {
         });
       });
       (cruiseCarRes.data || []).forEach(r => {
-        const unitPrice = carPriceMap.get(r.car_price_code)?.price;
+        const carInfo = carPriceMap.get(r.car_price_code);
+        const unitPrice = carInfo?.price || calculateUnitPrice(r.car_total_price, (r.car_count || r.passenger_count || 0));
         const quantity = Number(r.car_count || 0) > 0 ? Number(r.car_count || 0) : Number(r.passenger_count || 0);
         const quantityLabel = Number(r.car_count || 0) > 0 ? '대' : '명';
+        const routeText = [r.pickup_location, r.dropoff_location].filter(Boolean).join(' → ');
+
+        const vehicleFeeSummary = [formatGenericPrice(unitPrice, quantity, quantityLabel)].filter(Boolean) as string[];
+        if (vehicleFeeSummary.length === 0 && Number(r.car_total_price || 0) > 0) {
+          vehicleFeeSummary.push(`총액 ${formatDong(Number(r.car_total_price))}`);
+        }
+
         details.push({
           type: 'vehicle',
           label: '크루즈 차량',
-          sublabel: `${r.pickup_location || ''} → ${r.dropoff_location || ''}`,
+          sublabel: [carInfo?.car_type, routeText].filter(Boolean).join(' | '),
           date: r.pickup_datetime,
           price: r.car_total_price,
-          feeSummary: [formatGenericPrice(unitPrice, quantity, quantityLabel)].filter(Boolean) as string[],
+          feeSummary: vehicleFeeSummary,
           fields: [
+            { label: '크루즈', value: carInfo?.cruise },
+            { label: '차량명', value: carInfo?.car_type },
+            { label: '카테고리', value: carInfo?.car_category },
+            { label: '경로', value: routeText },
             { label: '차량 수', value: r.car_count },
             { label: '승객 수', value: r.passenger_count },
             { label: '픽업 장소', value: r.pickup_location },
@@ -392,6 +408,10 @@ export default function ReservationsPage() {
       (airportRes.data || []).forEach(r => {
         const quantity = Number(r.ra_passenger_count || 0) > 0 ? Number(r.ra_passenger_count || 0) : Number(r.ra_car_count || 0);
         const unitPrice = calculateUnitPrice(r.total_price, quantity);
+        const feeSummary = [formatGenericPrice(unitPrice, quantity, Number(r.ra_passenger_count || 0) > 0 ? '명' : '대')].filter(Boolean) as string[];
+        if (feeSummary.length === 0 && Number(r.total_price || 0) > 0) {
+          feeSummary.push(`총액 ${formatDong(Number(r.total_price))}`);
+        }
         details.push({
           type: 'airport',
           label: '공항',
@@ -399,7 +419,7 @@ export default function ReservationsPage() {
           date: r.ra_datetime ? new Date(r.ra_datetime).toLocaleDateString('ko-KR') : '',
           guest: r.ra_passenger_count,
           price: r.total_price,
-          feeSummary: [formatGenericPrice(unitPrice, quantity, Number(r.ra_passenger_count || 0) > 0 ? '명' : '대')].filter(Boolean) as string[],
+          feeSummary,
           fields: [
             { label: '구분', value: r.way_type || r.ra_way_type },
             { label: '일시', value: r.ra_datetime },
@@ -416,6 +436,10 @@ export default function ReservationsPage() {
       (hotelRes.data || []).forEach(r => {
         const quantity = Number(r.room_count || 0) > 0 ? Number(r.room_count || 0) : Number(r.guest_count || 0);
         const unitPrice = calculateUnitPrice(r.total_price, quantity);
+        const feeSummary = [formatGenericPrice(unitPrice, quantity, Number(r.room_count || 0) > 0 ? '객실' : '명')].filter(Boolean) as string[];
+        if (feeSummary.length === 0 && Number(r.total_price || 0) > 0) {
+          feeSummary.push(`총액 ${formatDong(Number(r.total_price))}`);
+        }
         details.push({
           type: 'hotel',
           label: '호텔',
@@ -423,7 +447,7 @@ export default function ReservationsPage() {
           date: r.checkin_date,
           guest: r.guest_count,
           price: r.total_price,
-          feeSummary: [formatGenericPrice(unitPrice, quantity, Number(r.room_count || 0) > 0 ? '객실' : '명')].filter(Boolean) as string[],
+          feeSummary,
           fields: [
             { label: '호텔 카테고리', value: r.hotel_category },
             { label: '체크인', value: r.checkin_date },
@@ -438,6 +462,10 @@ export default function ReservationsPage() {
       (tourRes.data || []).forEach(r => {
         const quantity = Number(r.tour_capacity || 0);
         const unitPrice = calculateUnitPrice(r.total_price, quantity);
+        const feeSummary = [formatGenericPrice(unitPrice, quantity, '명')].filter(Boolean) as string[];
+        if (feeSummary.length === 0 && Number(r.total_price || 0) > 0) {
+          feeSummary.push(`총액 ${formatDong(Number(r.total_price))}`);
+        }
         details.push({
           type: 'tour',
           label: '투어',
@@ -445,7 +473,7 @@ export default function ReservationsPage() {
           date: r.usage_date,
           guest: r.tour_capacity,
           price: r.total_price,
-          feeSummary: [formatGenericPrice(unitPrice, quantity, '명')].filter(Boolean) as string[],
+          feeSummary,
           fields: [
             { label: '사용일', value: r.usage_date },
             { label: '인원', value: r.tour_capacity },
@@ -459,13 +487,17 @@ export default function ReservationsPage() {
       (shtRes.data || []).forEach(r => {
         const quantity = 1;
         const unitPrice = calculateUnitPrice(r.car_total_price, quantity);
+        const feeSummary = [formatGenericPrice(unitPrice, quantity, '건')].filter(Boolean) as string[];
+        if (feeSummary.length === 0 && Number(r.car_total_price || 0) > 0) {
+          feeSummary.push(`총액 ${formatDong(Number(r.car_total_price))}`);
+        }
         details.push({
           type: 'sht',
           label: '스하차량',
           sublabel: `${r.vehicle_number || ''} / ${r.seat_number || ''}`,
           date: r.usage_date,
           price: r.car_total_price,
-          feeSummary: [formatGenericPrice(unitPrice, quantity, '건')].filter(Boolean) as string[],
+          feeSummary,
           fields: [
             { label: '탑승일', value: r.usage_date },
             { label: '차량번호', value: r.vehicle_number },
@@ -528,7 +560,13 @@ export default function ReservationsPage() {
     car_sht: 'bg-indigo-100 text-indigo-700', package: 'bg-pink-100 text-pink-700',
   }[type] || 'bg-gray-100 text-gray-700');
 
-  const hasValue = (value: any) => value !== undefined && value !== null && String(value) !== '';
+  const hasValue = (value: any) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'number') return value !== 0;
+    const str = String(value).trim();
+    if (str === '' || str === '0' || str === '0명' || str === '0대' || str === '0객실') return false;
+    return true;
+  };
 
   /* ── UI ──────────────────────────────────── */
   return (
