@@ -23,7 +23,8 @@ const fmtDate = (dateStr: string | null | undefined): string => {
 const getServiceType = (item: any) => {
   if (item.cruise && item.checkin) return 'cruise';
   if (item.boardingDate && item.vehicleNumber) return 'vehicle';
-  if (item.airportName && item.flightNumber) return 'airport';
+  const hasAirportHint = !!(item.tripType || item.route || item.airportName || item.flightNumber || item.placeName);
+  if (hasAirportHint && (item.date || item.time || item.airportName)) return 'airport';
   if (item.hotelName && item.checkinDate) return 'hotel';
   if (item.tourName && item.startDate) return 'tour';
   if (item.pickupDate && item.usagePeriod) return 'rentcar';
@@ -146,12 +147,26 @@ function ServiceDetails({ item, type, meta }: { item: any; type: string; meta: S
 }
 
 /* ── 메인 모달 ── */
-export default function ReservationDetailModal({ isOpen, onClose, item }: { isOpen: boolean; onClose: () => void; item: any }) {
+export default function ReservationDetailModal({
+  isOpen,
+  onClose,
+  item,
+  items,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  item: any;
+  items?: any[];
+}) {
   if (!isOpen || !item) return null;
 
   const type = getServiceType(item);
   const meta = SERVICE_META[type] || DEFAULT_META;
   const Icon = meta.icon;
+  const groupedItems = (items && items.length > 0) ? items : [item];
+  const groupKey = item?.source === 'sh'
+    ? `주문번호 ${item?.orderId || '-'}`
+    : `견적ID ${item?.quoteId || item?.re_quote_id || item?.quote_id || '-'}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -174,6 +189,7 @@ export default function ReservationDetailModal({ isOpen, onClose, item }: { isOp
               {item.customerName || item.name || '고객 정보 없음'}
               {item.customerEnglishName ? ` (${item.customerEnglishName})` : ''}
             </p>
+            <p className="text-xs text-gray-400 mt-0.5">{groupKey} · 연결 서비스 {groupedItems.length}건</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 shrink-0">
             <X className="w-5 h-5 text-gray-500" />
@@ -197,8 +213,23 @@ export default function ReservationDetailModal({ isOpen, onClose, item }: { isOp
             </div>
           </div>
 
-          {/* 서비스 상세 */}
-          <ServiceDetails item={item} type={type} meta={meta} />
+          {/* 연결된 서비스 상세 */}
+          <div className="space-y-3">
+            {groupedItems.map((serviceItem, idx) => {
+              const serviceType = getServiceType(serviceItem);
+              const serviceMeta = SERVICE_META[serviceType] || DEFAULT_META;
+              return (
+                <div key={`${serviceItem?.orderId || serviceItem?.re_id || 'item'}-${idx}`}>
+                  {groupedItems.length > 1 && (
+                    <div className="mb-2 text-xs text-gray-500 font-medium">
+                      서비스 {idx + 1}
+                    </div>
+                  )}
+                  <ServiceDetails item={serviceItem} type={serviceType} meta={serviceMeta} />
+                </div>
+              );
+            })}
+          </div>
 
         </div>
       </div>

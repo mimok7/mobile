@@ -96,7 +96,8 @@ const fetchAllRows = async (tableName: string) => {
 const getServiceType = (item: any): string => {
   if (item.cruise && item.checkin) return 'cruise';
   if (item.boardingDate && item.vehicleNumber) return 'vehicle';
-  if (item.airportName && item.flightNumber) return 'airport';
+  const hasAirportHint = !!(item.tripType || item.route || item.airportName || item.flightNumber || item.placeName);
+  if (hasAirportHint && (item.date || item.time || item.airportName)) return 'airport';
   if (item.hotelName && item.checkinDate) return 'hotel';
   if (item.tourName && item.startDate) return 'tour';
   if (item.pickupDate && item.usagePeriod) return 'rentcar';
@@ -135,7 +136,29 @@ export default function SchedulePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const getQuoteKey = (item: any) => item?.quoteId || item?.re_quote_id || item?.quote_id || null;
+
+  const openDetail = (item: any) => {
+    let related: any[] = [item];
+
+    if (item?.source === 'sh') {
+      if (item?.orderId) {
+        related = allData.filter(d => d?.source === 'sh' && d?.orderId === item.orderId);
+      }
+    } else {
+      const quoteKey = getQuoteKey(item);
+      if (quoteKey) {
+        related = allData.filter(d => d?.source !== 'sh' && getQuoteKey(d) === quoteKey);
+      }
+    }
+
+    setSelectedItem(item);
+    setSelectedItems(related.length > 0 ? related : [item]);
+    setModalOpen(true);
+  };
 
   /* ── 데이터 로드 (sh_* 테이블) ─── */
   const loadData = async () => {
@@ -357,7 +380,7 @@ export default function SchedulePage() {
     return (
       <div
         key={`${item.orderId}-${idx}`}
-        onClick={() => { setSelectedItem(item); setModalOpen(true); }}
+        onClick={() => openDetail(item)}
         className={`bg-white border rounded-xl shadow-sm p-3 space-y-2 ${past ? 'opacity-50' : ''} cursor-pointer`}
       >
         {/* 헤더 */}
@@ -368,12 +391,12 @@ export default function SchedulePage() {
           <span className="font-bold text-sm flex-1">{conf.name}</span>
           {item.source === 'sh' && (
             <button
-              onClick={e => { e.stopPropagation(); setSelectedItem(item); setModalOpen(true); }}
+              onClick={e => { e.stopPropagation(); openDetail(item); }}
               className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
             >Old</button>
           )}
           <button
-            onClick={e => { e.stopPropagation(); setSelectedItem(item); setModalOpen(true); }}
+            onClick={e => { e.stopPropagation(); openDetail(item); }}
             className={`text-xs px-2 py-0.5 rounded-full font-medium bg-${conf.color}-500 text-white hover:bg-${conf.color}-600`}
           >상세</button>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${past ? 'bg-gray-200 text-gray-600' : `bg-${conf.color}-100 text-${conf.color}-700`}`}>
@@ -609,7 +632,7 @@ export default function SchedulePage() {
           </div>
         )}
       </div>
-      <ReservationDetailModal isOpen={modalOpen} onClose={() => setModalOpen(false)} item={selectedItem} />
+      <ReservationDetailModal isOpen={modalOpen} onClose={() => setModalOpen(false)} item={selectedItem} items={selectedItems} />
     </div>
   );
 }
