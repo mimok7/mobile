@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Search,
   Save,
+  FilePenLine,
   Ship,
   Plane,
   Building,
@@ -285,6 +286,12 @@ export default function ReservationEditPage() {
     );
   };
 
+  const getDetailEditPath = (service: ServiceReservation) => {
+    if (service.re_type === 'cruise') return `/reservation-edit/cruise?id=${service.re_id}`;
+    if (service.re_type === 'airport') return `/reservation-edit/airport?id=${service.re_id}`;
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="sticky top-0 z-30 bg-white border-b shadow-sm px-4 py-3">
@@ -421,6 +428,20 @@ export default function ReservationEditPage() {
                             <Save className="w-4 h-4" />
                             {saving ? '저장중' : '저장'}
                           </button>
+                        </div>
+
+                        <div className="mt-2">
+                          {getDetailEditPath(service) ? (
+                            <Link
+                              href={getDetailEditPath(service)!}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              <FilePenLine className="w-3.5 h-3.5" />
+                              상세수정
+                            </Link>
+                          ) : (
+                            <span className="text-[11px] text-gray-400">상세수정 미지원 서비스</span>
+                          )}
                         </div>
                       </div>
                     );
