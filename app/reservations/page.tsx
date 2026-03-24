@@ -316,7 +316,7 @@ export default function ReservationsPage() {
       // 가격 정보 조회
       const cruiseCodes = (cruiseRes.data || []).map(r => r.room_price_code).filter(Boolean);
       const cruiseCarPriceCodes = (cruiseCarRes.data || []).map(r => r.car_price_code).filter(Boolean);
-      const [roomPrices, carPrices] = await Promise.all([
+      const [roomPrices, carPrices, rentcarPrices] = await Promise.all([
         cruiseCodes.length > 0
           ? supabase
               .from('cruise_rate_card')
@@ -326,9 +326,13 @@ export default function ReservationsPage() {
         cruiseCarPriceCodes.length > 0
           ? supabase.from('car_price').select('car_code, price, car_type, cruise, car_category').in('car_code', cruiseCarPriceCodes)
           : { data: [] },
+        cruiseCarPriceCodes.length > 0
+          ? supabase.from('rentcar_price').select('rentcar_code, vehicle_type, price').in('rentcar_code', cruiseCarPriceCodes)
+          : { data: [] },
       ]);
       const roomPriceMap = new Map((roomPrices.data || []).map(r => [r.id, r]));
       const carPriceMap = new Map((carPrices.data || []).map(r => [r.car_code, r]));
+      const rentcarPriceMap = new Map((rentcarPrices.data || []).map((r: any) => [r.rentcar_code, r]));
 
       const details: DetailServiceItem[] = [];
 
@@ -372,8 +376,10 @@ export default function ReservationsPage() {
         });
       });
       (cruiseCarRes.data || []).forEach(r => {
+        const rentcarInfo = rentcarPriceMap.get(r.car_price_code);
         const carInfo = carPriceMap.get(r.car_price_code);
-        const unitPrice = carInfo?.price || calculateUnitPrice(r.car_total_price, (r.car_count || r.passenger_count || 0));
+        const vehicleType = rentcarInfo?.vehicle_type || carInfo?.car_type;
+        const unitPrice = rentcarInfo?.price || carInfo?.price || calculateUnitPrice(r.car_total_price, (r.car_count || r.passenger_count || 0));
         const quantity = Number(r.car_count || 0) > 0 ? Number(r.car_count || 0) : Number(r.passenger_count || 0);
         const quantityLabel = Number(r.car_count || 0) > 0 ? '대' : '명';
         const routeText = [r.pickup_location, r.dropoff_location].filter(Boolean).join(' → ');
@@ -386,13 +392,14 @@ export default function ReservationsPage() {
         details.push({
           type: 'vehicle',
           label: '크루즈 차량',
-          sublabel: [carInfo?.car_type, routeText].filter(Boolean).join(' | '),
+          // 요청사항: 카드 하단 첫 줄은 경로 대신 차종을 표시
+          sublabel: vehicleType || '',
           date: r.pickup_datetime,
           price: r.car_total_price,
           feeSummary: vehicleFeeSummary,
           fields: [
             { label: '크루즈', value: carInfo?.cruise },
-            { label: '차량명', value: carInfo?.car_type },
+            { label: '차량명', value: vehicleType },
             { label: '카테고리', value: carInfo?.car_category },
             { label: '경로', value: routeText },
             { label: '차량 수', value: r.car_count },
