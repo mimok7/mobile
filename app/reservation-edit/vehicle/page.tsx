@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Car, Save } from 'lucide-react';
@@ -20,7 +20,7 @@ interface CruiseCarItem {
   request_note?: string | null;
 }
 
-export default function MobileVehicleReservationEditPage() {
+function MobileVehicleReservationEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reservationId = searchParams.get('id');
@@ -252,6 +252,14 @@ export default function MobileVehicleReservationEditPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MobileVehicleReservationEditPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">불러오는 중...</div>}>
+      <MobileVehicleReservationEditContent />
+    </Suspense>
   );
 }
 

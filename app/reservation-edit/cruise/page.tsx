@@ -1,13 +1,13 @@
 // @ts-nocheck
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Ship } from 'lucide-react';
 import supabase from '@/lib/supabase';
 
-export default function MobileCruiseReservationEditPage() {
+function MobileCruiseReservationEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reservationId = searchParams.get('id');
@@ -203,5 +203,13 @@ export default function MobileCruiseReservationEditPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MobileCruiseReservationEditPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">불러오는 중...</div>}>
+      <MobileCruiseReservationEditContent />
+    </Suspense>
   );
 }

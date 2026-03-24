@@ -1,13 +1,13 @@
 // @ts-nocheck
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Plane } from 'lucide-react';
 import supabase from '@/lib/supabase';
 
-export default function MobileAirportReservationEditPage() {
+function MobileAirportReservationEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reservationId = searchParams.get('id');
@@ -276,6 +276,14 @@ export default function MobileAirportReservationEditPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MobileAirportReservationEditPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">불러오는 중...</div>}>
+      <MobileAirportReservationEditContent />
+    </Suspense>
   );
 }
 
