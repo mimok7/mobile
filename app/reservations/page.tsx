@@ -77,13 +77,40 @@ export default function ReservationsPage() {
   const loadReservations = async () => {
     try {
       setLoading(true);
-      const { data: rows, error: err } = await supabase
-        .from('reservation')
-        .select('re_id, re_type, re_status, re_created_at, re_quote_id, re_user_id')
-        .order('re_created_at', { ascending: false });
 
-      if (err) throw err;
-      const allRows = rows || [];
+      // DB 레벨 필터: Supabase 기본 1000행 제한 대응
+      const typeMap: Record<string, string[]> = {
+        cruise: ['cruise'], airport: ['airport'], hotel: ['hotel'],
+        tour: ['tour'], rentcar: ['rentcar'], vehicle: ['car'],
+        sht: ['sht', 'car_sht', 'reservation_car_sht'], package: ['package'],
+      };
+      const matchTypes = serviceFilter !== 'all' ? (typeMap[serviceFilter] || [serviceFilter]) : null;
+      const PAGE_SIZE = 1000;
+      const MAX_PAGES = 100;
+      const allRows: any[] = [];
+
+      // 상태/타입을 DB에서 먼저 필터링 후 range 페이지 조회로 누락 없이 수집
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        let query = supabase
+          .from('reservation')
+          .select('re_id, re_type, re_status, re_created_at, re_quote_id, re_user_id')
+          .order('re_created_at', { ascending: false })
+          .order('re_id', { ascending: false })
+          .range(from, to);
+
+        if (filter !== 'all') query = query.eq('re_status', filter);
+        if (matchTypes) query = query.in('re_type', matchTypes);
+
+        const { data: pageRows, error: err } = await query;
+        if (err) throw err;
+
+        const chunk = pageRows || [];
+        allRows.push(...chunk);
+        if (chunk.length < PAGE_SIZE) break;
+      }
 
       // 사용자 정보 조회
       const userIds = [...new Set(allRows.map(r => r.re_user_id).filter(Boolean))];
@@ -136,21 +163,8 @@ export default function ReservationsPage() {
 
       let list = Object.values(grouped);
 
-      // 상태 필터
-      if (filter !== 'all') {
-        list = list.filter(item => item.services.some(s => s.re_status === filter));
-      }
-
-      // 서비스 필터
-      if (serviceFilter !== 'all') {
-        const typeMap: Record<string, string[]> = {
-          cruise: ['cruise'], airport: ['airport'], hotel: ['hotel'],
-          tour: ['tour'], rentcar: ['rentcar'], vehicle: ['car'],
-          sht: ['sht', 'car_sht', 'reservation_car_sht'], package: ['package'],
-        };
-        const matchTypes = typeMap[serviceFilter] || [serviceFilter];
-        list = list.filter(item => item.services.some(s => matchTypes.includes(s.re_type)));
-      }
+      // DB에서 이미 필터링됨 - 빈 그룹만 제거
+      list = list.filter(item => item.services.length > 0);
 
       // 정렬
       list.sort((a, b) => {
