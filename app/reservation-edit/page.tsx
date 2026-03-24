@@ -289,6 +289,9 @@ export default function ReservationEditPage() {
   const getDetailEditPath = (service: ServiceReservation) => {
     if (service.re_type === 'cruise') return `/reservation-edit/cruise?id=${service.re_id}`;
     if (service.re_type === 'airport') return `/reservation-edit/airport?id=${service.re_id}`;
+    if (service.re_type === 'car' || service.re_type === 'vehicle') {
+      return `/reservation-edit/vehicle?id=${service.re_id}`;
+    }
     return null;
   };
 
@@ -437,10 +440,10 @@ export default function ReservationEditPage() {
                               className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200"
                             >
                               <FilePenLine className="w-3.5 h-3.5" />
-                              상세수정
+                              수정
                             </Link>
                           ) : (
-                            <span className="text-[11px] text-gray-400">상세수정 미지원 서비스</span>
+                            <span className="text-[11px] text-gray-400">수정 미지원 서비스</span>
                           )}
                         </div>
                       </div>
