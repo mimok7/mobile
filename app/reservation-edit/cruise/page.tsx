@@ -7,6 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Ship } from 'lucide-react';
 import supabase from '@/lib/supabase';
 
+interface CruiseMeta {
+  cruise_name?: string | null;
+  room_type?: string | null;
+  schedule_type?: string | null;
+}
+
 function MobileCruiseReservationEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -15,6 +21,7 @@ function MobileCruiseReservationEditContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cruiseMeta, setCruiseMeta] = useState<CruiseMeta | null>(null);
 
   const [formData, setFormData] = useState({
     room_count: 1,
@@ -39,7 +46,7 @@ function MobileCruiseReservationEditContent() {
 
       const { data, error: detailErr } = await supabase
         .from('reservation_cruise')
-        .select('reservation_id, room_count, guest_count, checkin, request_note')
+        .select('reservation_id, room_price_code, room_count, guest_count, checkin, request_note')
         .eq('reservation_id', reservationId)
         .limit(1)
         .maybeSingle();
@@ -48,6 +55,22 @@ function MobileCruiseReservationEditContent() {
       if (!data) {
         setError('크루즈 상세 데이터를 찾을 수 없습니다.');
         return;
+      }
+
+      if (data.room_price_code) {
+        const { data: metaRow, error: metaErr } = await supabase
+          .from('cruise_rate_card')
+          .select('cruise_name, room_type, schedule_type')
+          .eq('id', data.room_price_code)
+          .maybeSingle();
+
+        if (!metaErr && metaRow) {
+          setCruiseMeta(metaRow);
+        } else {
+          setCruiseMeta(null);
+        }
+      } else {
+        setCruiseMeta(null);
       }
 
       setFormData({
@@ -136,6 +159,15 @@ function MobileCruiseReservationEditContent() {
                 크루즈 핵심 항목
               </div>
 
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="text-xs font-semibold text-blue-800 mb-2">크루즈 정보</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <Info label="크루즈명" value={cruiseMeta?.cruise_name} />
+                  <Info label="객실명" value={cruiseMeta?.room_type} />
+                  <Info label="일정" value={cruiseMeta?.schedule_type} />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs text-gray-500 mb-1">객실 수 (room_count)</label>
                 <input
@@ -211,5 +243,15 @@ export default function MobileCruiseReservationEditPage() {
     <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">불러오는 중...</div>}>
       <MobileCruiseReservationEditContent />
     </Suspense>
+  );
+}
+
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-800 text-right">{value}</span>
+    </div>
   );
 }

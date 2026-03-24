@@ -20,6 +20,16 @@ interface CruiseCarItem {
   request_note?: string | null;
 }
 
+interface RentcarPriceMeta {
+  rent_code: string;
+  vehicle_type?: string | null;
+  way_type?: string | null;
+  route?: string | null;
+  price?: number | null;
+  category?: string | null;
+  car_category_code?: string | null;
+}
+
 function MobileVehicleReservationEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,6 +39,7 @@ function MobileVehicleReservationEditContent() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<CruiseCarItem[]>([]);
+  const [rentcarMetaMap, setRentcarMetaMap] = useState<Record<string, RentcarPriceMeta>>({});
 
   useEffect(() => {
     if (!reservationId) {
@@ -59,6 +70,26 @@ function MobileVehicleReservationEditContent() {
       }
 
       setItems(data);
+
+      const codes = Array.from(new Set((data || []).map((d: any) => d.car_price_code).filter(Boolean)));
+      if (codes.length > 0) {
+        const { data: rentRows, error: rentErr } = await supabase
+          .from('rentcar_price')
+          .select('rent_code, vehicle_type, way_type, route, price, category, car_category_code')
+          .in('rent_code', codes);
+
+        if (rentErr) {
+          console.warn('rentcar_price 조회 실패:', rentErr.message);
+        } else {
+          const nextMap: Record<string, RentcarPriceMeta> = {};
+          (rentRows || []).forEach((row: any) => {
+            nextMap[row.rent_code] = row;
+          });
+          setRentcarMetaMap(nextMap);
+        }
+      } else {
+        setRentcarMetaMap({});
+      }
     } catch (err: any) {
       setError(err?.message || '크루즈 차량 상세 데이터를 불러오지 못했습니다.');
     } finally {
@@ -151,14 +182,22 @@ function MobileVehicleReservationEditContent() {
                   차량 {index + 1}
                 </div>
 
-                <Field label="차량 코드 (car_price_code)">
-                  <input
-                    type="text"
-                    value={item.car_price_code || ''}
-                    onChange={(e) => updateItem(item.id, { car_price_code: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border rounded-lg"
-                  />
-                </Field>
+                <div className="rounded-lg border bg-cyan-50 border-cyan-200 p-3">
+                  <div className="text-xs font-semibold text-cyan-800 mb-2">렌트카 가격 정보</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <Info label="차종" value={rentcarMetaMap[item.car_price_code || '']?.vehicle_type} />
+                    <Info label="구분" value={rentcarMetaMap[item.car_price_code || '']?.way_type} />
+                    <Info label="경로" value={rentcarMetaMap[item.car_price_code || '']?.route} />
+                    <Info
+                      label="단가"
+                      value={
+                        rentcarMetaMap[item.car_price_code || '']?.price != null
+                          ? `${Number(rentcarMetaMap[item.car_price_code || '']?.price).toLocaleString()}동`
+                          : null
+                      }
+                    />
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="차량 수 (car_count)">
@@ -268,6 +307,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-800 text-right">{value}</span>
     </div>
   );
 }
