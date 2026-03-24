@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Calendar, ClipboardList } from 'lucide-react';
+import { Calendar, ClipboardList, FilePenLine } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -39,6 +39,18 @@ export default function HomePage() {
             <div>
               <h2 className="font-semibold text-gray-800">예약 처리</h2>
               <p className="text-xs text-gray-500">예약 변경 및 일괄 처리</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/reservation-edit" className="block">
+          <div className="flex items-center gap-4 p-5 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]">
+            <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-amber-100">
+              <FilePenLine className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-800">예약 수정</h2>
+              <p className="text-xs text-gray-500">서비스별 상태 수정</p>
             </div>
           </div>
         </Link>
