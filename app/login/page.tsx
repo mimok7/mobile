@@ -1,11 +1,19 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import { isManagerUser } from '@/lib/auth';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -113,6 +121,16 @@ export default function LoginPage() {
             {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-100 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6 text-center text-slate-600">
+        로그인 화면을 준비하는 중입니다...
       </div>
     </div>
   );
