@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
+import supabase from '@/lib/supabase';
 
-const MANAGER_ROLE_CANDIDATES = ['manager', 'admin_manager', 'super_manager'];
+const MANAGER_ROLE_CANDIDATES = ['manager'];
 
 const normalizeRole = (value: unknown): string => {
   if (typeof value !== 'string') return '';
@@ -30,6 +31,23 @@ export const isManagerUser = (user: User | null | undefined): boolean => {
   if (!user) return false;
   const roles = extractRoles(user);
   return roles.some((role) => MANAGER_ROLE_CANDIDATES.includes(role));
+};
+
+export const canAccessManagerApp = async (user: User | null | undefined): Promise<boolean> => {
+  if (!user) return false;
+
+  // 1) 메타데이터에 role이 세팅된 경우 즉시 허용
+  if (isManagerUser(user)) return true;
+
+  // 2) 매니저 프로젝트와 동일하게 users.role을 기준으로 권한 확인
+  const { data, error } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (error || !data) return false;
+  return normalizeRole(data.role) === 'manager';
 };
 
 export const isPublicPath = (pathname: string): boolean => {

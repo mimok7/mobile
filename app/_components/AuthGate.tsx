@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
-import { isManagerUser, isPublicPath } from '@/lib/auth';
+import { canAccessManagerApp, isPublicPath } from '@/lib/auth';
 
 type AuthGateProps = {
   children: React.ReactNode;
@@ -28,7 +28,7 @@ export default function AuthGate({ children }: AuthGateProps) {
         return;
       }
 
-      if (!isManagerUser(session.user)) {
+      if (!(await canAccessManagerApp(session.user))) {
         await supabase.auth.signOut();
         router.replace('/login?error=forbidden');
         if (mounted) setChecking(false);
@@ -52,15 +52,17 @@ export default function AuthGate({ children }: AuthGateProps) {
         return;
       }
 
-      if (!isManagerUser(session.user)) {
-        supabase.auth.signOut();
-        router.replace('/login?error=forbidden');
-        return;
-      }
+      void (async () => {
+        if (!(await canAccessManagerApp(session.user))) {
+          await supabase.auth.signOut();
+          router.replace('/login?error=forbidden');
+          return;
+        }
 
-      if (isPublic) {
-        router.replace('/');
-      }
+        if (isPublic) {
+          router.replace('/');
+        }
+      })();
     });
 
     return () => {

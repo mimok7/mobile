@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import supabase from '@/lib/supabase';
-import { isManagerUser } from '@/lib/auth';
+import { canAccessManagerApp } from '@/lib/auth';
 
 export default function LoginPage() {
   return (
@@ -32,7 +32,7 @@ function LoginPageContent() {
       const { data } = await supabase.auth.getSession();
       if (!data.session) return;
 
-      if (isManagerUser(data.session.user)) {
+      if (await canAccessManagerApp(data.session.user)) {
         router.replace('/');
         return;
       }
@@ -59,7 +59,7 @@ function LoginPageContent() {
       return;
     }
 
-    if (!isManagerUser(data.user)) {
+    if (!(await canAccessManagerApp(data.user))) {
       await supabase.auth.signOut();
       setErrorMessage('매니저 권한이 있는 계정만 로그인할 수 있습니다.');
       setLoading(false);
