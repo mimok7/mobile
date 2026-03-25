@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthGate from './_components/AuthGate';
 
 export const metadata: Metadata = {
   title: "스테이하롱 모바일",
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        {children}
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

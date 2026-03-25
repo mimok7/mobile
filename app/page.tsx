@@ -2,11 +2,30 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Calendar, ClipboardList, FilePenLine } from 'lucide-react';
+import supabase from '@/lib/supabase';
 
 export default function HomePage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-sm font-medium text-slate-600 hover:text-slate-900"
+        >
+          로그아웃
+        </button>
+      </div>
+
       <div className="text-center mb-10">
         <Image
           src="/logo.png"
