@@ -184,6 +184,9 @@ export default function ReservationDetailModal({
               {item.source === 'sh' && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium">Old</span>
               )}
+              {item.source === 'new' && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">New</span>
+              )}
             </div>
             <p className="text-sm text-gray-500 truncate">
               {item.customerName || item.name || '고객 정보 없음'}
@@ -206,7 +209,7 @@ export default function ReservationDetailModal({
               고객 정보
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-              <Field label="주문번호"   value={item.orderId} />
+              <Field label="주문/예약"  value={item.orderId || item.reservationId || item.re_id} />
               <Field label="이메일"     value={item.email} />
               <Field label="한글이름"   value={item.customerName} />
               <Field label="영문이름"   value={item.customerEnglishName} />

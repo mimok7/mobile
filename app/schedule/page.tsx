@@ -12,6 +12,7 @@ import ReservationDetailModal from './ReservationDetailModal';
 
 /* ── 타입 정의 ──────────────────────────────── */
 type ViewMode = 'day' | 'week' | 'month';
+type SourceFilter = 'all' | 'old' | 'new';
 
 /* ── 날짜 유틸 ──────────────────────────────── */
 const parseDate = (dateStr: string | null | undefined): Date | null => {
@@ -92,6 +93,22 @@ const fetchAllRows = async (tableName: string) => {
   return allData;
 };
 
+const fetchRowsByIds = async (tableName: string, column: string, ids: string[]) => {
+  if (!ids.length) return [];
+  const chunkSize = 200;
+  let allData: any[] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .in(column, chunk);
+    if (error) throw error;
+    allData = allData.concat(data || []);
+  }
+  return allData;
+};
+
 /* ── 서비스 판별 ──────────────────────────────── */
 const getServiceType = (item: any): string => {
   if (item.cruise && item.checkin) return 'cruise';
@@ -132,6 +149,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -140,10 +158,17 @@ export default function SchedulePage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const openDetail = (item: any) => {
-    // sh_* 테이블 데이터에서 같은 orderId를 가진 항목 그룹화
     let related: any[] = [item];
-    if (item?.orderId) {
-      related = allData.filter(d => d?.orderId === item.orderId);
+
+    if (item?.source === 'sh') {
+      if (item?.orderId) {
+        related = allData.filter(d => d?.source === 'sh' && d?.orderId === item.orderId);
+      }
+    } else {
+      const groupKey = item?.quoteId || item?.re_quote_id || item?.reservationId;
+      if (groupKey) {
+        related = allData.filter(d => d?.source === 'new' && (d?.quoteId || d?.re_quote_id || d?.reservationId) === groupKey);
+      }
     }
 
     setSelectedItem(item);
@@ -151,20 +176,11 @@ export default function SchedulePage() {
     setModalOpen(true);
   };
 
-  /* ── 데이터 로드: sh_* 테이블만 로드 (예약 관련 테이블 제외) ─── */
+  /* ── 데이터 로드: sh_* + reservation_* 통합 로드 ─── */
   const loadData = async () => {
     setLoading(true);
     try {
-      // sh_* 테이블만 조회 (신 시스템 -> 구 시스템 데이터만 표시)
-      // - sh_r: 크루즈 예약
-      // - sh_c: 차량 현황
-      // - sh_cc: 연결차량
-      // - sh_p: 공항/숙박지
-      // - sh_h: 호텔
-      // - sh_t: 투어
-      // - sh_rc: 렌터카
-      // - sh_m: 고객정보
-      const [shR, shC, shCC, shP, shH, shT, shRC, shM] = await Promise.all([
+      const [shR, shC, shCC, shP, shH, shT, shRC, shM, reservationsRaw] = await Promise.all([
         fetchAllRows('sh_r'),
         fetchAllRows('sh_c'),
         fetchAllRows('sh_cc'),
@@ -173,6 +189,7 @@ export default function SchedulePage() {
         fetchAllRows('sh_t'),
         fetchAllRows('sh_rc'),
         fetchAllRows('sh_m'),
+        fetchAllRows('reservation'),
       ]);
 
       const userMap = new Map(shM.map((u: any) => [
@@ -180,7 +197,7 @@ export default function SchedulePage() {
         { korean_name: u.korean_name, english_name: u.english_name, email: u.email },
       ]));
 
-      const mapped = [
+      const oldMapped = [
         ...shR.map((r: any) => {
           const u = userMap.get(r.order_id);
           return {
@@ -301,8 +318,156 @@ export default function SchedulePage() {
         }),
       ];
 
-      // mark source for each row (sh_* origin)
-      setAllData(mapped.map(m => ({ ...m, source: 'sh' })));
+      const allowedTypes = ['cruise', 'car', 'airport', 'hotel', 'tour', 'rentcar', 'sht', 'car_sht'];
+      const reservations = (reservationsRaw || []).filter((r: any) => allowedTypes.includes(r.re_type));
+      const reservationIds = Array.from(new Set(reservations.map((r: any) => r.re_id).filter(Boolean)));
+      const userIds = Array.from(new Set(reservations.map((r: any) => r.re_user_id).filter(Boolean)));
+
+      const [usersData, cruiseData, carData, airportData, hotelData, tourData, rentcarData, shtData] = await Promise.all([
+        fetchRowsByIds('users', 'id', userIds),
+        fetchRowsByIds('reservation_cruise', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_cruise_car', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_airport', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_hotel', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_tour', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_rentcar', 'reservation_id', reservationIds),
+        fetchRowsByIds('reservation_car_sht', 'reservation_id', reservationIds),
+      ]);
+
+      const usersById = new Map((usersData || []).map((u: any) => [u.id, u]));
+      const cruiseByRid = new Map((cruiseData || []).map((x: any) => [x.reservation_id, x]));
+      const carByRid = new Map((carData || []).map((x: any) => [x.reservation_id, x]));
+      const airportByRid = new Map((airportData || []).map((x: any) => [x.reservation_id, x]));
+      const hotelByRid = new Map((hotelData || []).map((x: any) => [x.reservation_id, x]));
+      const tourByRid = new Map((tourData || []).map((x: any) => [x.reservation_id, x]));
+      const rentcarByRid = new Map((rentcarData || []).map((x: any) => [x.reservation_id, x]));
+      const shtByRid = new Map((shtData || []).map((x: any) => [x.reservation_id, x]));
+
+      const newMapped = reservations.map((r: any) => {
+        const user = usersById.get(r.re_user_id);
+        const base = {
+          source: 'new',
+          reservationId: r.re_id,
+          re_quote_id: r.re_quote_id,
+          quoteId: r.re_quote_id,
+          customerName: user?.name || '',
+          customerEnglishName: user?.english_name || '',
+          email: user?.email || '',
+        };
+
+        if (r.re_type === 'cruise') {
+          const d = cruiseByRid.get(r.re_id) || {};
+          return {
+            ...base,
+            cruise: '신규 크루즈',
+            roomType: d.room_price_code || '',
+            roomCount: Number(d.room_count || 0),
+            checkin: d.checkin || '',
+            adult: Number(d.adult_count || 0),
+            child: Number(d.child_count || 0),
+            toddler: Number(d.infant_count || 0),
+            requestNote: d.request_note || '',
+          };
+        }
+
+        if (r.re_type === 'car') {
+          const d = carByRid.get(r.re_id) || {};
+          return {
+            ...base,
+            carType: d.car_price_code || '',
+            carCount: Number(d.car_count || 0),
+            passengerCount: Number(d.passenger_count || 0),
+            pickupDatetime: d.pickup_datetime || '',
+            pickupLocation: d.pickup_location || '',
+            dropoffLocation: d.dropoff_location || '',
+            requestNote: d.request_note || '',
+          };
+        }
+
+        if (r.re_type === 'airport') {
+          const d = airportByRid.get(r.re_id) || {};
+          const dt = d.ra_datetime ? new Date(d.ra_datetime) : null;
+          return {
+            ...base,
+            tripType: d.way_type || d.ra_way_type || '',
+            category: d.ra_airport_location || '',
+            route: [d.ra_airport_location, d.accommodation_info].filter(Boolean).join(' ↔ '),
+            date: d.ra_datetime || '',
+            time: dt && !isNaN(dt.getTime()) ? dt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '',
+            airportName: d.ra_airport_location || '',
+            flightNumber: d.ra_flight_number || '',
+            passengerCount: Number(d.ra_passenger_count || 0),
+            carCount: Number(d.ra_car_count || 0),
+            placeName: d.accommodation_info || '',
+            requestNote: d.request_note || '',
+          };
+        }
+
+        if (r.re_type === 'hotel') {
+          const d = hotelByRid.get(r.re_id) || {};
+          return {
+            ...base,
+            hotelName: d.hotel_category || '신규 호텔',
+            roomName: d.hotel_price_code || '',
+            roomType: '',
+            roomCount: Number(d.room_count || 0),
+            days: Number(d.nights || 0),
+            checkinDate: d.checkin_date || '',
+            adult: Number(d.guest_count || 0),
+            child: 0,
+            toddler: 0,
+            requestNote: d.request_note || '',
+          };
+        }
+
+        if (r.re_type === 'tour') {
+          const d = tourByRid.get(r.re_id) || {};
+          return {
+            ...base,
+            tourName: '신규 투어',
+            tourType: d.tour_price_code || '',
+            startDate: d.usage_date || '',
+            endDate: '',
+            participants: Number(d.tour_capacity || 0),
+            pickupLocation: d.pickup_location || '',
+            requestNote: d.request_note || '',
+          };
+        }
+
+        if (r.re_type === 'rentcar') {
+          const d = rentcarByRid.get(r.re_id) || {};
+          const pickupDate = d.pickup_datetime ? String(d.pickup_datetime).split('T')[0] : '';
+          return {
+            ...base,
+            carType: d.rentcar_price_code || '',
+            carCount: Number(d.car_count || 0),
+            pickupDate,
+            pickupTime: d.pickup_datetime || '',
+            pickupLocation: d.pickup_location || '',
+            destination: d.destination || '',
+            usagePeriod: d.rental_days ? `${d.rental_days}일` : '',
+            passengerCount: Number(d.driver_count || 0),
+            requestNote: d.request_note || '',
+          };
+        }
+
+        const d = shtByRid.get(r.re_id) || {};
+        return {
+          ...base,
+          boardingDate: d.usage_date || '',
+          serviceType: d.service_type || d.sht_category || '',
+          category: d.category || '',
+          vehicleNumber: d.vehicle_number || '',
+          seatNumber: d.seat_number || '',
+          name: d.name || user?.name || '',
+          requestNote: d.request_note || '',
+        };
+      });
+
+      setAllData([
+        ...oldMapped.map(m => ({ ...m, source: 'sh' })),
+        ...newMapped,
+      ]);
     } catch (err) {
       console.error('데이터 로드 실패:', err);
     } finally {
@@ -315,11 +480,18 @@ export default function SchedulePage() {
   /* ── 필터링 ── */
   let filtered = allData;
 
+  if (sourceFilter === 'old') {
+    filtered = filtered.filter(item => item.source === 'sh');
+  } else if (sourceFilter === 'new') {
+    filtered = filtered.filter(item => item.source === 'new');
+  }
+
   // 검색어 필터
   if (activeSearch.trim()) {
     const q = activeSearch.toLowerCase();
-    filtered = allData.filter(item => {
+    filtered = filtered.filter(item => {
       const fields = [
+        item.reservationId,
         item.orderId, item.customerName, item.customerEnglishName,
         item.email, item.cruise, item.carType, item.vehicleNumber,
         item.airportName, item.flightNumber, item.hotelName,
@@ -329,7 +501,7 @@ export default function SchedulePage() {
     });
   } else {
     // 날짜 필터
-    filtered = allData.filter(item => {
+    filtered = filtered.filter(item => {
       const dateStr = getDateField(item);
       const d = parseDate(dateStr);
       if (!d) return false;
@@ -379,7 +551,7 @@ export default function SchedulePage() {
 
     return (
       <div
-        key={`${item.orderId}-${idx}`}
+        key={`${item.source}-${item.orderId || item.reservationId || idx}-${idx}`}
         onClick={() => openDetail(item)}
         className={`bg-white border rounded-xl shadow-sm p-3 space-y-2 ${past ? 'opacity-50' : ''} cursor-pointer`}
       >
@@ -394,6 +566,12 @@ export default function SchedulePage() {
               onClick={e => { e.stopPropagation(); openDetail(item); }}
               className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
             >Old</button>
+          )}
+          {item.source === 'new' && (
+            <button
+              onClick={e => { e.stopPropagation(); openDetail(item); }}
+              className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+            >New</button>
           )}
           <button
             onClick={e => { e.stopPropagation(); openDetail(item); }}
@@ -554,7 +732,7 @@ export default function SchedulePage() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && setActiveSearch(searchQuery)}
-            placeholder="이름, 주문번호 검색..."
+            placeholder="이름, 주문번호, 예약ID 검색..."
             className="flex-1 px-3 py-2 text-sm border rounded-lg bg-gray-50"
           />
           <button
@@ -571,6 +749,13 @@ export default function SchedulePage() {
               초기화
             </button>
           )}
+        </div>
+
+        {/* 신구 필터 */}
+        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 mb-2">
+          <FilterBtn label="전체" active={sourceFilter === 'all'} onClick={() => setSourceFilter('all')} />
+          <FilterBtn label="구" active={sourceFilter === 'old'} onClick={() => setSourceFilter('old')} />
+          <FilterBtn label="신" active={sourceFilter === 'new'} onClick={() => setSourceFilter('new')} />
         </div>
 
         {/* 서비스 필터 */}
