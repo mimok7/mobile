@@ -74,6 +74,25 @@ const isPastDate = (dateStr: string) => {
   return d < today;
 };
 
+const normalizeWayType = (value: string | null | undefined) => {
+  const way = (value || '').toLowerCase();
+  if (way === 'pickup' || way === '픽업') return '픽업';
+  if (way === 'sending' || way === 'dropoff' || way === '샌딩') return '샌딩';
+  return value || '';
+};
+
+const getPlus8DateTimeParts = (value: string | null | undefined) => {
+  if (!value) return { date: '', time: '' };
+  const parsed = new Date(String(value).replace(' ', 'T'));
+  if (isNaN(parsed.getTime())) return { date: String(value), time: '' };
+  const plus8 = new Date(parsed.getTime() + 8 * 60 * 60 * 1000);
+  const yyyy = plus8.getFullYear();
+  const mm = String(plus8.getMonth() + 1).padStart(2, '0');
+  const dd = String(plus8.getDate()).padStart(2, '0');
+  const time = plus8.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return { date: `${yyyy}-${mm}-${dd}`, time };
+};
+
 /* ── DB 조회(전체 행) ─────────────────────────── */
 const fetchAllRows = async (tableName: string) => {
   let allData: any[] = [];
@@ -334,6 +353,12 @@ export default function SchedulePage() {
         fetchRowsByIds('reservation_car_sht', 'reservation_id', reservationIds),
       ]);
 
+      const airportCodes = Array.from(new Set((airportData || []).map((x: any) => x.airport_price_code).filter(Boolean)));
+      const airportPriceData = airportCodes.length > 0
+        ? await fetchRowsByIds('airport_price', 'airport_code', airportCodes)
+        : [];
+      const airportPriceMap = new Map((airportPriceData || []).map((x: any) => [`${x.airport_code}-${x.service_type || ''}`, x]));
+
       const usersById = new Map((usersData || []).map((u: any) => [u.id, u]));
       const cruiseByRid = new Map((cruiseData || []).map((x: any) => [x.reservation_id, x]));
       const carByRid = new Map((carData || []).map((x: any) => [x.reservation_id, x]));
@@ -386,16 +411,22 @@ export default function SchedulePage() {
 
         if (r.re_type === 'airport') {
           const d = airportByRid.get(r.re_id) || {};
-          const dt = d.ra_datetime ? new Date(d.ra_datetime) : null;
+          const wayType = normalizeWayType(d.way_type || d.ra_way_type || d.service_type || '');
+          const priceInfo = airportPriceMap.get(`${d.airport_price_code || ''}-${wayType}`)
+            || (airportPriceData || []).find((p: any) => p.airport_code === d.airport_price_code)
+            || {};
+          const dtParts = getPlus8DateTimeParts(d.ra_datetime || '');
           return {
             ...base,
-            tripType: d.way_type || d.ra_way_type || '',
+            tripType: wayType,
+            wayType,
             category: d.ra_airport_location || '',
-            route: [d.ra_airport_location, d.accommodation_info].filter(Boolean).join(' ↔ '),
-            date: d.ra_datetime || '',
-            time: dt && !isNaN(dt.getTime()) ? dt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '',
+            route: [priceInfo.route, d.ra_airport_location, d.accommodation_info].filter(Boolean).join(' ↔ '),
+            date: dtParts.date,
+            time: dtParts.time,
             airportName: d.ra_airport_location || '',
             flightNumber: d.ra_flight_number || '',
+            vehicleType: d.vehicle_type || priceInfo.vehicle_type || '',
             passengerCount: Number(d.ra_passenger_count || 0),
             carCount: Number(d.ra_car_count || 0),
             placeName: d.accommodation_info || '',
@@ -436,13 +467,13 @@ export default function SchedulePage() {
 
         if (r.re_type === 'rentcar') {
           const d = rentcarByRid.get(r.re_id) || {};
-          const pickupDate = d.pickup_datetime ? String(d.pickup_datetime).split('T')[0] : '';
+          const pickupParts = getPlus8DateTimeParts(d.pickup_datetime || '');
           return {
             ...base,
             carType: d.rentcar_price_code || '',
             carCount: Number(d.car_count || 0),
-            pickupDate,
-            pickupTime: d.pickup_datetime || '',
+            pickupDate: pickupParts.date,
+            pickupTime: pickupParts.time,
             pickupLocation: d.pickup_location || '',
             destination: d.destination || '',
             usagePeriod: d.rental_days ? `${d.rental_days}일` : '',
@@ -622,10 +653,11 @@ export default function SchedulePage() {
           )}
           {type === 'airport' && (
             <>
-              <Row label="구분" value={`${item.tripType} - ${item.category}`} bold />
+              <Row label="구분" value={`${item.tripType || '-'} - ${item.category || '-'}`} bold />
               <Row label="경로" value={item.route} />
               <DateRow date={dateObj} time={item.time} />
               <Row label="공항" value={`${item.airportName} / ${item.flightNumber}`} />
+              <Row label="차종" value={item.vehicleType || item.carType} />
               <Row label="인원/차량" value={`👥 ${item.passengerCount}명 / 🚗 ${item.carCount}대`} />
             </>
           )}

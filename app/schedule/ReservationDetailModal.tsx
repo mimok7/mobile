@@ -5,13 +5,24 @@ import { X, Ship, Plane, Building, MapPin, Car, FileText, User } from 'lucide-re
 const fmt = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '미정';
   try {
-    const str = String(dateStr).replace(' ', 'T').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
-    const m = str.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return String(dateStr);
-    const [, yyyy, mm, dd, hh, min] = m;
-    const h = parseInt(hh, 10);
-    return `${yyyy}. ${mm}. ${dd}. ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${min}`;
+    const raw = String(dateStr).replace(' ', 'T');
+    const parsed = new Date(raw);
+    if (isNaN(parsed.getTime())) return String(dateStr);
+    const plus8 = new Date(parsed.getTime() + 8 * 60 * 60 * 1000);
+    const yyyy = plus8.getFullYear();
+    const mm = String(plus8.getMonth() + 1).padStart(2, '0');
+    const dd = String(plus8.getDate()).padStart(2, '0');
+    const hh = plus8.getHours();
+    const min = String(plus8.getMinutes()).padStart(2, '0');
+    return `${yyyy}. ${mm}. ${dd}. ${hh < 12 ? '오전' : '오후'} ${hh % 12 || 12}:${min}`;
   } catch { return String(dateStr); }
+};
+
+const normalizeWayType = (value: string | null | undefined) => {
+  const way = (value || '').toLowerCase();
+  if (way === 'pickup' || way === '픽업') return '픽업';
+  if (way === 'sending' || way === 'dropoff' || way === '샌딩') return '샌딩';
+  return value || '-';
 };
 
 const fmtDate = (dateStr: string | null | undefined): string => {
@@ -94,13 +105,14 @@ function ServiceDetails({ item, type, meta }: { item: any; type: string; meta: S
         </>}
 
         {type === 'airport' && <>
-          <Field label="구분"      value={item.tripType ? <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.tripType?.includes('픽업') ? 'bg-blue-100 text-blue-800' : item.tripType?.includes('샌딩') ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}`}>{item.tripType}</span> : null} />
+          <Field label="구분"      value={normalizeWayType(item.tripType || item.wayType)} />
           <Field label="카테고리"  value={item.category} />
           <Field label="경로"      value={item.route} />
           <Field label="날짜"      value={fmtDate(item.date)} />
           <Field label="시간"      value={item.time} />
           <Field label="공항"      value={item.airportName} />
           <Field label="항공편"    value={item.flightNumber} />
+          <Field label="차종"      value={item.vehicleType || item.carType} />
           <Field label="승객수"    value={item.passengerCount ? `${item.passengerCount}명` : null} />
           <Field label="차량수"    value={item.carCount ? `${item.carCount}대` : null} />
           <Field label="장소"      value={item.placeName} />
@@ -209,7 +221,6 @@ export default function ReservationDetailModal({
               고객 정보
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-              <Field label="주문/예약"  value={item.orderId || item.reservationId || item.re_id} />
               <Field label="이메일"     value={item.email} />
               <Field label="한글이름"   value={item.customerName} />
               <Field label="영문이름"   value={item.customerEnglishName} />
