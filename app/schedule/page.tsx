@@ -139,20 +139,11 @@ export default function SchedulePage() {
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const getQuoteKey = (item: any) => item?.quoteId || item?.re_quote_id || item?.quote_id || null;
-
   const openDetail = (item: any) => {
+    // sh_* 테이블 데이터에서 같은 orderId를 가진 항목 그룹화
     let related: any[] = [item];
-
-    if (item?.source === 'sh') {
-      if (item?.orderId) {
-        related = allData.filter(d => d?.source === 'sh' && d?.orderId === item.orderId);
-      }
-    } else {
-      const quoteKey = getQuoteKey(item);
-      if (quoteKey) {
-        related = allData.filter(d => d?.source !== 'sh' && getQuoteKey(d) === quoteKey);
-      }
+    if (item?.orderId) {
+      related = allData.filter(d => d?.orderId === item.orderId);
     }
 
     setSelectedItem(item);
@@ -160,10 +151,19 @@ export default function SchedulePage() {
     setModalOpen(true);
   };
 
-  /* ── 데이터 로드 (sh_* 테이블) ─── */
+  /* ── 데이터 로드: sh_* 테이블만 로드 (예약 관련 테이블 제외) ─── */
   const loadData = async () => {
     setLoading(true);
     try {
+      // sh_* 테이블만 조회 (신 시스템 -> 구 시스템 데이터만 표시)
+      // - sh_r: 크루즈 예약
+      // - sh_c: 차량 현황
+      // - sh_cc: 연결차량
+      // - sh_p: 공항/숙박지
+      // - sh_h: 호텔
+      // - sh_t: 투어
+      // - sh_rc: 렌터카
+      // - sh_m: 고객정보
       const [shR, shC, shCC, shP, shH, shT, shRC, shM] = await Promise.all([
         fetchAllRows('sh_r'),
         fetchAllRows('sh_c'),
